@@ -6,6 +6,34 @@ http.createServer((req, res) => {
 }).listen(process.env.PORT || 8080);
 // --- RENDER WEB SERVER END ---
 
+require('dotenv').config();
+const TOKEN = process.env.DISCORD_TOKEN;
+const CLIENT_ID = process.env.CLIENT_ID;
+
+const client = new Client({
+  intents: [GatewayIntentBits.Guilds]
+});
+
+// 1. LOGIN FIRST
+client.login(TOKEN).then(() => {
+  console.log(`✅ Logged in as ${client.user.tag}`);
+}).catch(console.error);
+
+// 2. REGISTER COMMANDS SECOND
+const rest = new REST({ version: '10' }).setToken(TOKEN);
+(async () => {
+  try {
+    console.log('Refreshing slash commands...');
+    await rest.put(
+      Routes.applicationCommands(CLIENT_ID),
+      { body: commands }
+    );
+    console.log('✅ Slash command registered');
+  } catch (err) {
+    console.error('❌ Registration Error:', err);
+  }
+})();
+
 const {
   Client,
   GatewayIntentBits,
