@@ -1,39 +1,16 @@
-// --- RENDER WEB SERVER START ---
+// ==========================================
+// 1. RENDER WEB SERVER (Keeps the bot alive)
+// ==========================================
 const http = require('http');
 http.createServer((req, res) => {
-  res.write("Bot is alive!");
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.write("Bot is running!");
   res.end();
 }).listen(process.env.PORT || 8080);
-// --- RENDER WEB SERVER END ---
 
-require('dotenv').config();
-const TOKEN = process.env.DISCORD_TOKEN;
-const CLIENT_ID = process.env.CLIENT_ID;
-
-const client = new Client({
-  intents: [GatewayIntentBits.Guilds]
-});
-
-// 1. LOGIN FIRST
-client.login(TOKEN).then(() => {
-  console.log(`✅ Logged in as ${client.user.tag}`);
-}).catch(console.error);
-
-// 2. REGISTER COMMANDS SECOND
-const rest = new REST({ version: '10' }).setToken(TOKEN);
-(async () => {
-  try {
-    console.log('Refreshing slash commands...');
-    await rest.put(
-      Routes.applicationCommands(CLIENT_ID),
-      { body: commands }
-    );
-    console.log('✅ Slash command registered');
-  } catch (err) {
-    console.error('❌ Registration Error:', err);
-  }
-})();
-
+// ==========================================
+// 2. IMPORTS & CONFIGURATION
+// ==========================================
 const {
   Client,
   GatewayIntentBits,
@@ -42,8 +19,6 @@ const {
   SlashCommandBuilder,
   Events
 } = require('discord.js');
-
-// Load environment variables from .env file
 require('dotenv').config();
 
 const TOKEN = process.env.DISCORD_TOKEN;
@@ -54,28 +29,39 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds]
 });
 
-// Register slash command
+// ==========================================
+// 3. SLASH COMMAND DEFINITION
+// ==========================================
 const commands = [
   new SlashCommandBuilder()
     .setName('dkp')
     .setDescription('Check your DKP points privately'),
 ].map(cmd => cmd.toJSON());
 
-const rest = new REST({ version: '10' }).setToken(TOKEN);
+// ==========================================
+// 4. LOGIN & COMMAND REGISTRATION
+// ==========================================
+client.login(TOKEN).then(() => {
+  const rest = new REST({ version: '10' }).setToken(TOKEN);
+  (async () => {
+    try {
+      console.log('Refreshing slash commands...');
+      await rest.put(
+        Routes.applicationCommands(CLIENT_ID),
+        { body: commands }
+      );
+      console.log('✅ Slash command registered successfully');
+    } catch (err) {
+      console.error('❌ Registration Error:', err);
+    }
+  })();
+}).catch(err => {
+  console.error("❌ Login failed! Double-check your DISCORD_TOKEN on Render.", err);
+});
 
-(async () => {
-  try {
-    console.log('Refreshing slash commands...');
-    await rest.put(
-      Routes.applicationCommands(CLIENT_ID),
-      { body: commands }
-    );
-    console.log('Slash command registered successfully');
-  } catch (err) {
-    console.error('Error registering commands:', err);
-  }
-})();
-
+// ==========================================
+// 5. BOT EVENTS
+// ==========================================
 client.once(Events.ClientReady, () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
@@ -84,13 +70,13 @@ client.on(Events.InteractionCreate, async interaction => {
   if (!interaction.isChatInputCommand()) return;
   if (interaction.commandName !== 'dkp') return;
 
-  // flags: 64 = Ephemeral (Only you can see this)
+  // Use flags: 64 to make the reply "Ephemeral" (Only the user sees it)
   await interaction.deferReply({ flags: 64 });
 
   const ign = interaction.member?.nickname || interaction.user.username;
 
   try {
-    // ignore_cache=1 ensures it pulls current numbers from Google Sheets
+    // We add ignore_cache=1 so that updates in Google Sheets show up immediately
     const response = await fetch(
       `${SHEETDB_API}/search?sheet=DKP System&IGN=${encodeURIComponent(ign)}&ignore_cache=1`
     );
@@ -99,24 +85,22 @@ client.on(Events.InteractionCreate, async interaction => {
 
     if (!response.ok || text.startsWith('<')) {
       console.error('SheetDB error:', text);
-      return interaction.editReply('⚠️ SheetDB error: DKP System sheet not found.');
+      return interaction.editReply('⚠️ SheetDB error: Could not reach the DKP database.');
     }
 
     const data = JSON.parse(text);
 
     if (!Array.isArray(data) || data.length === 0) {
-      return interaction.editReply(`❌ No DKP record found for **${ign}** in the IGN column.`);
+      return interaction.editReply(`❌ No DKP record found for **${ign}**. Make sure your Discord nickname matches the IGN in the sheet.`);
     }
 
-    // Try both naming conventions just in case SheetDB reformats the header
+    // Checking for column names (SheetDB might change spaces to underscores)
     const biddingDKP = data[0]['Bidding_dkp'] || data[0]['Bidding DKP'] || "0";
 
-    await interaction.editReply(`🤫 **${ign}**\nYour **Bidding DKP** is **${biddingDKP}**`);
+    await interaction.editReply(`🤫 **${ign}**\nYour current **Bidding DKP** is: **${biddingDKP}**`);
 
   } catch (err) {
-    console.error(err);
-    await interaction.editReply('⚠️ Unexpected error fetching DKP data.');
+    console.error('Fetch Error:', err);
+    await interaction.editReply('⚠️ Unexpected error fetching your DKP data.');
   }
 });
-
-client.login(TOKEN);
