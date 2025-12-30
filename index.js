@@ -1,21 +1,7 @@
-console.log('DISCORD_TOKEN exists?', !!process.env.DISCORD_TOKEN);
-console.log('CLIENT_ID exists?', !!process.env.CLIENT_ID);
-
 // ==========================================
-// 1. RENDER WEB SERVER (Keeps the bot alive)
+// 0. IMPORTS & CONFIGURATION
 // ==========================================
 const http = require('http');
-http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.write("Bot is running!");
-  res.end();
-}).listen(process.env.PORT || 8080, () => {
-  console.log(`🌐 Web server running on port ${process.env.PORT || 8080}`);
-});
-
-// ==========================================
-// 2. IMPORTS & CONFIGURATION
-// ==========================================
 const {
   Client,
   GatewayIntentBits,
@@ -24,27 +10,51 @@ const {
   SlashCommandBuilder,
   Events
 } = require('discord.js');
-
 require('dotenv').config();
 
-// Node-fetch workaround for commonjs
+// Node-fetch workaround for CommonJS
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
+// ==========================================
+// 1. ENV VARIABLES
+// ==========================================
 const TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const SHEETDB_API = 'https://sheetdb.io/api/v1/wsen6e04jyn0l';
+const PORT = process.env.PORT || 5000;
 
 if (!TOKEN || !CLIENT_ID) {
   console.error('❌ Missing DISCORD_TOKEN or CLIENT_ID in environment variables!');
   process.exit(1);
 }
 
+console.log('DISCORD_TOKEN exists?', !!TOKEN);
+console.log('CLIENT_ID exists?', !!CLIENT_ID);
+
+// ==========================================
+// 2. KEEP-ALIVE WEB SERVER
+// ==========================================
+http.createServer((req, res) => {
+  if (req.url === '/') {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Bot is running!');
+  } else {
+    res.writeHead(404);
+    res.end();
+  }
+}).listen(PORT, '0.0.0.0', () => {
+  console.log(`🌐 Web server running on port ${PORT}`);
+});
+
+// ==========================================
+// 3. DISCORD CLIENT
+// ==========================================
 const client = new Client({
   intents: [GatewayIntentBits.Guilds]
 });
 
 // ==========================================
-// 3. SLASH COMMAND DEFINITION
+// 4. SLASH COMMANDS
 // ==========================================
 const commands = [
   new SlashCommandBuilder()
@@ -53,10 +63,9 @@ const commands = [
 ].map(cmd => cmd.toJSON());
 
 // ==========================================
-// 4. LOGIN & COMMAND REGISTRATION
+// 5. LOGIN & REGISTER COMMANDS
 // ==========================================
-console.log("🔑 Attempting to log in...");
-
+console.log('🔑 Attempting to log in...');
 client.login(TOKEN)
   .then(() => {
     console.log(`✅ Bot logged in as ${client.user.tag}`);
@@ -80,7 +89,7 @@ client.login(TOKEN)
   });
 
 // ==========================================
-// 5. BOT EVENTS
+// 6. BOT EVENTS
 // ==========================================
 client.once(Events.ClientReady, () => {
   console.log(`🤖 Bot is ready: ${client.user.tag}`);
@@ -90,16 +99,13 @@ client.on(Events.InteractionCreate, async interaction => {
   if (!interaction.isChatInputCommand()) return;
   if (interaction.commandName !== 'dkp') return;
 
-  // Ephemeral reply (only visible to user)
   await interaction.deferReply({ ephemeral: true });
-
   const ign = interaction.member?.nickname || interaction.user.username;
 
   try {
     const response = await fetch(
       `${SHEETDB_API}/search?sheet=DKP System&IGN=${encodeURIComponent(ign)}&ignore_cache=1`
     );
-
     const text = await response.text();
 
     if (!response.ok || text.startsWith('<')) {
@@ -114,7 +120,6 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 
     const biddingDKP = data[0]['Bidding_dkp'] || data[0]['Bidding DKP'] || "0";
-
     await interaction.editReply(`🤫 **${ign}**\nYour current **Bidding DKP** is: **${biddingDKP}**`);
 
   } catch (err) {
