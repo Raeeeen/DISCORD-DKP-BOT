@@ -6,7 +6,9 @@ http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.write("Bot is running!");
   res.end();
-}).listen(process.env.PORT || 8080);
+}).listen(process.env.PORT || 8080, () => {
+  console.log(`🌐 Web server running on port ${process.env.PORT || 8080}`);
+});
 
 // ==========================================
 // 2. IMPORTS & CONFIGURATION
@@ -19,11 +21,20 @@ const {
   SlashCommandBuilder,
   Events
 } = require('discord.js');
+
 require('dotenv').config();
+
+// Node-fetch workaround for commonjs
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 const TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const SHEETDB_API = 'https://sheetdb.io/api/v1/wsen6e04jyn0l';
+
+if (!TOKEN || !CLIENT_ID) {
+  console.error('❌ Missing DISCORD_TOKEN or CLIENT_ID in environment variables!');
+  process.exit(1);
+}
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds]
@@ -41,42 +52,46 @@ const commands = [
 // ==========================================
 // 4. LOGIN & COMMAND REGISTRATION
 // ==========================================
-client.login(TOKEN).then(() => {
-  const rest = new REST({ version: '10' }).setToken(TOKEN);
-  (async () => {
-    try {
-      console.log('Refreshing slash commands...');
-      await rest.put(
-        Routes.applicationCommands(CLIENT_ID),
-        { body: commands }
-      );
-      console.log('✅ Slash command registered successfully');
-    } catch (err) {
-      console.error('❌ Registration Error:', err);
-    }
-  })();
-}).catch(err => {
-  console.error("❌ Login failed! Double-check your DISCORD_TOKEN on Render.", err);
-});
+client.login(TOKEN)
+  .then(() => {
+    console.log(`✅ Bot logged in as ${client.user.tag}`);
+
+    const rest = new REST({ version: '10' }).setToken(TOKEN);
+    (async () => {
+      try {
+        console.log('🔄 Refreshing slash commands...');
+        await rest.put(
+          Routes.applicationCommands(CLIENT_ID),
+          { body: commands }
+        );
+        console.log('✅ Slash commands registered successfully');
+      } catch (err) {
+        console.error('❌ Slash command registration error:', err);
+      }
+    })();
+  })
+  .catch(err => {
+    console.error('❌ Bot login failed! Double-check your DISCORD_TOKEN on Render.', err);
+  });
 
 // ==========================================
 // 5. BOT EVENTS
 // ==========================================
 client.once(Events.ClientReady, () => {
-  console.log(`✅ Logged in as ${client.user.tag}`);
+  console.log(`🤖 Bot is ready: ${client.user.tag}`);
 });
 
 client.on(Events.InteractionCreate, async interaction => {
   if (!interaction.isChatInputCommand()) return;
   if (interaction.commandName !== 'dkp') return;
 
-  // Use flags: 64 to make the reply "Ephemeral" (Only the user sees it)
-  await interaction.deferReply({ flags: 64 });
+  // Ephemeral reply (only visible to user)
+  await interaction.deferReply({ ephemeral: true });
 
   const ign = interaction.member?.nickname || interaction.user.username;
 
   try {
-    // We add ignore_cache=1 so that updates in Google Sheets show up immediately
+    // Fetch from SheetDB
     const response = await fetch(
       `${SHEETDB_API}/search?sheet=DKP System&IGN=${encodeURIComponent(ign)}&ignore_cache=1`
     );
@@ -84,7 +99,7 @@ client.on(Events.InteractionCreate, async interaction => {
     const text = await response.text();
 
     if (!response.ok || text.startsWith('<')) {
-      console.error('SheetDB error:', text);
+      console.error('❌ SheetDB error:', text);
       return interaction.editReply('⚠️ SheetDB error: Could not reach the DKP database.');
     }
 
@@ -94,13 +109,13 @@ client.on(Events.InteractionCreate, async interaction => {
       return interaction.editReply(`❌ No DKP record found for **${ign}**. Make sure your Discord nickname matches the IGN in the sheet.`);
     }
 
-    // Checking for column names (SheetDB might change spaces to underscores)
+    // Column check
     const biddingDKP = data[0]['Bidding_dkp'] || data[0]['Bidding DKP'] || "0";
 
     await interaction.editReply(`🤫 **${ign}**\nYour current **Bidding DKP** is: **${biddingDKP}**`);
 
   } catch (err) {
-    console.error('Fetch Error:', err);
+    console.error('❌ Fetch error:', err);
     await interaction.editReply('⚠️ Unexpected error fetching your DKP data.');
   }
 });
