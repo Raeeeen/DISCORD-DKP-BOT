@@ -52,6 +52,8 @@ const commands = [
 // ==========================================
 // 4. LOGIN & COMMAND REGISTRATION
 // ==========================================
+console.log("🔑 Attempting to log in...");
+
 client.login(TOKEN)
   .then(() => {
     console.log(`✅ Bot logged in as ${client.user.tag}`);
@@ -71,7 +73,7 @@ client.login(TOKEN)
     })();
   })
   .catch(err => {
-    console.error('❌ Bot login failed! Double-check your DISCORD_TOKEN on Render.', err);
+    console.error('❌ Bot login failed! Check your DISCORD_TOKEN and CLIENT_ID.', err);
   });
 
 // ==========================================
@@ -91,7 +93,6 @@ client.on(Events.InteractionCreate, async interaction => {
   const ign = interaction.member?.nickname || interaction.user.username;
 
   try {
-    // Fetch from SheetDB
     const response = await fetch(
       `${SHEETDB_API}/search?sheet=DKP System&IGN=${encodeURIComponent(ign)}&ignore_cache=1`
     );
@@ -109,7 +110,6 @@ client.on(Events.InteractionCreate, async interaction => {
       return interaction.editReply(`❌ No DKP record found for **${ign}**. Make sure your Discord nickname matches the IGN in the sheet.`);
     }
 
-    // Column check
     const biddingDKP = data[0]['Bidding_dkp'] || data[0]['Bidding DKP'] || "0";
 
     await interaction.editReply(`🤫 **${ign}**\nYour current **Bidding DKP** is: **${biddingDKP}**`);
