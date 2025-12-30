@@ -1,3 +1,6 @@
+console.log('DISCORD_TOKEN exists?', !!process.env.DISCORD_TOKEN);
+console.log('CLIENT_ID exists?', !!process.env.CLIENT_ID);
+
 // ==========================================
 // 1. RENDER WEB SERVER (Keeps the bot alive)
 // ==========================================
