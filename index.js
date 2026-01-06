@@ -1,6 +1,3 @@
-// ==========================================
-// 0. IMPORTS & CONFIGURATION
-// ==========================================
 const http = require('http');
 const {
   Client,
@@ -12,28 +9,17 @@ const {
 } = require('discord.js');
 require('dotenv').config();
 
-// Node-fetch workaround for CommonJS
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
-// ==========================================
-// 1. ENV VARIABLES
-// ==========================================
 const TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
-const SHEETDB_API = 'https://sheetdb.io/api/v1/wsen6e04jyn0l';
+const SHEETDB_API = '';
 const PORT = process.env.PORT || 5000;
 
 if (!TOKEN || !CLIENT_ID) {
-  console.error('❌ Missing DISCORD_TOKEN or CLIENT_ID in environment variables!');
   process.exit(1);
 }
 
-console.log('DISCORD_TOKEN exists?', !!TOKEN);
-console.log('CLIENT_ID exists?', !!CLIENT_ID);
-
-// ==========================================
-// 2. KEEP-ALIVE WEB SERVER
-// ==========================================
 http.createServer((req, res) => {
   if (req.url === '/') {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -46,39 +32,28 @@ http.createServer((req, res) => {
   console.log(`🌐 Web server running on port ${PORT}`);
 });
 
-// ==========================================
-// 3. DISCORD CLIENT
-// ==========================================
 const client = new Client({
   intents: [GatewayIntentBits.Guilds]
 });
 
-// ==========================================
-// 4. SLASH COMMANDS
-// ==========================================
+
+// SLASH COMMANDS
 const commands = [
   new SlashCommandBuilder()
     .setName('dkp')
     .setDescription('Check your DKP points privately'),
 ].map(cmd => cmd.toJSON());
 
-// ==========================================
-// 5. LOGIN & REGISTER COMMANDS
-// ==========================================
-console.log('🔑 Attempting to log in...');
 client.login(TOKEN)
   .then(() => {
-    console.log(`✅ Bot logged in as ${client.user.tag}`);
-
+    
     const rest = new REST({ version: '10' }).setToken(TOKEN);
     (async () => {
       try {
-        console.log('🔄 Refreshing slash commands...');
         await rest.put(
           Routes.applicationCommands(CLIENT_ID),
           { body: commands }
         );
-        console.log('✅ Slash commands registered successfully');
       } catch (err) {
         console.error('❌ Slash command registration error:', err);
       }
@@ -88,9 +63,7 @@ client.login(TOKEN)
     console.error('❌ Bot login failed! Check your DISCORD_TOKEN and CLIENT_ID.', err);
   });
 
-// ==========================================
-// 6. BOT EVENTS
-// ==========================================
+// BOT EVENTS
 client.once(Events.ClientReady, () => {
   console.log(`🤖 Bot is ready: ${client.user.tag}`);
 });
@@ -109,7 +82,6 @@ client.on(Events.InteractionCreate, async interaction => {
     const text = await response.text();
 
     if (!response.ok || text.startsWith('<')) {
-      console.error('❌ SheetDB error:', text);
       return interaction.editReply('⚠️ SheetDB error: Could not reach the DKP database.');
     }
 
