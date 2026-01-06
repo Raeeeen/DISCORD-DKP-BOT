@@ -37,7 +37,7 @@ const client = new Client({
 });
 
 
-// SLASH COMMANDS
+// SLASH COMMANDS //
 const commands = [
   new SlashCommandBuilder()
     .setName('dkp')
@@ -63,7 +63,7 @@ client.login(TOKEN)
     console.error('❌ Bot login failed! Check your DISCORD_TOKEN and CLIENT_ID.', err);
   });
 
-// BOT EVENTS
+// BOT EVENTS //
 client.once(Events.ClientReady, () => {
   console.log(`🤖 Bot is ready: ${client.user.tag}`);
 });
